@@ -3,89 +3,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-typedef struct {
-    size_t start;
-    size_t end;
-} TemplateElement;
-
-typedef struct {
-    TemplateElement* elements;
-    size_t elementCount;
-} Templite;
-
-typedef struct { float data; } TENG9_FLOAT;
-typedef struct { char  data; } TENG9_CHAR;
-typedef struct { int   data; } TENG9_INT;
-typedef struct { char* data; } TENG9_STRING;
-
-typedef enum {
-    CHARACTER,
-    FLOATING,
-    INTEGER,
-    STRING,
-} TENG9_FLAG;
-
-typedef union {
-    TENG9_CHAR   character;
-    TENG9_FLOAT  floating;
-    TENG9_INT    integer;
-    TENG9_STRING string;
-} TENG9_DATATYPES;
-
-typedef struct {
-    TENG9_FLAG      type;
-    TENG9_DATATYPES data;
-} TENG9_DATA;
-
-TENG9_DATA* TENG9_CREATEDATA(TENG9_FLAG flag, void* dat) {
-    TENG9_DATA* tmp = (TENG9_DATA*)malloc(sizeof(TENG9_DATA));
-    tmp->type = flag;
-
-    switch (flag) {
-        case CHARACTER:  tmp->data.character = *((TENG9_CHAR*)dat);   break;
-        case FLOATING:   tmp->data.floating  = *((TENG9_FLOAT*)dat);  break;
-        case INTEGER:    tmp->data.integer   = *((TENG9_INT*)dat);    break;
-        case STRING:     tmp->data.string    = *((TENG9_STRING*)dat); break;
-    }
-
-    return tmp;
-}
-
-typedef const char* (*DataToStringFunc)(TENG9_DATATYPES);
-
-const char* CharToString(TENG9_DATATYPES data) {
-    static char str[2];
-    str[0] = data.character.data;
-    str[1] = '\0';
-    return str;
-}
-
-const char* FloatToString(TENG9_DATATYPES data) {
-    static char str[32];
-    snprintf(str, sizeof(str), "%f", data.floating.data);
-    return str;
-}
-
-const char* IntToString(TENG9_DATATYPES data) {
-    static char str[32];
-    snprintf(str, sizeof(str), "%d", data.integer.data);
-    return str;
-}
-
-const char* StringToString(TENG9_DATATYPES data) {
-    return data.string.data;
-}
-
-DataToStringFunc ToStringFuncs[] = {
-    CharToString,
-    FloatToString,
-    IntToString,
-    StringToString
-};
-
-const char* ToString(TENG9_DATA data) {
-    return ToStringFuncs[data.type](data.data);
-}
+#include "templator.h"
+#include "api.h"
 
 void parseTemplate(const char* template, Templite* templite) {
     size_t length = strlen(template);
@@ -111,7 +30,7 @@ void parseTemplate(const char* template, Templite* templite) {
     }
 }
 
-void renderTemplate(const char* template, const Templite* templite, TENG9_DATA data[], size_t amount) {
+void renderTemplate(const char* template, const Templite* templite, teng9_data data[], size_t amount) {
     size_t last = 0;
 
     for (size_t i = 0; i < templite->elementCount; i++) {
@@ -123,7 +42,7 @@ void renderTemplate(const char* template, const Templite* templite, TENG9_DATA d
         strncpy(name, template + templite->elements[i].start + 2, length);           // to exclude {{ at the start
         name[length] = '\0';
 
-        printf("[%s]", ToString(data[i]));
+        printf("[%s]", data[i].value);
 
         free(name);
         last = templite->elements[i].end;
@@ -132,16 +51,57 @@ void renderTemplate(const char* template, const Templite* templite, TENG9_DATA d
     printf("%s\n", template + last);
 }
 
-int main() {
-    const char* templateStr = "Hello {{name}}, welcome to {{location}}!";
+static inline char*
+executeElement(const char* element, teng9_expr parsemethod) {
+switch (parsemethod) {
+    char*       ws_javascript_queue[] = { }; // webserver javascript queue, obviously won't be here in the final version
+    const char* observer =
+        "    (r) => {                                                      \n"
+        "        // a part of the injected javascript api                  \n"
+        "        WS_ELEMENT_SET(document.getElementById(\"element\"),      \n"
+        "                       r);                                        \n"
+        "    }                                                             \n";
 
-    TENG9_STRING name     = { "John Doe" };
-    TENG9_STRING location = { "Australia" };
+    case JS_EXPR_BROWSER:
+        /* queue this code into js that has to be injected
+           on execution of this javascript,
+           take the result / return value and...
+           */
+        WS_JAVASCRIPT_ADD(element, observer);
+        break;
 
-    TENG9_DATA data[2] = {
-        *TENG9_CREATEDATA(STRING, &name),
-        *TENG9_CREATEDATA(STRING, &location)
+    case C_EXPR_INTERP:
+        /* queue this code into the c interpreter (you read that right) */
+        BRUHCC_INTERPRETER(element);
+        break;
+
+    case C_EXPR_MACHINE:
+        /* queue this code into the c compiler for execution */
+        BRUHCC_COMPILER(element);
+        break;
+    
+    case SIMPLE_STRING:
+        /* this isn't code, return it */
+        return (char*)element;
+};
+
+return "hello world";
+}
+
+teng9_data TENG9_CREATE_DATA(const char* value, teng9_expr parsemethod) {
+    return
+    (teng9_data) {
+        .value       = (char*)value,
+        .parsemethod = parsemethod,
     };
+}
+
+int main() {
+    teng9_data name     = { .value = "John Doe",  .parsemethod = SIMPLE_STRING };
+    teng9_data location = { .value = "Australia", .parsemethod = SIMPLE_STRING };
+
+    const char* templateStr = "Hello {{name}}, welcome to {{location}}!";
+    teng9_data  data[2]     = { name, location };
 
     Templite templite;
    
