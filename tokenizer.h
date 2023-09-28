@@ -9,9 +9,9 @@ typedef enum {
     SIMPLE_DELIMITER_RIGHT,      //  }}
     EXPRESSION_DELIMITER_LEFT,   // {%
     EXPRESSION_DELIMITER_RIGHT,  //  %}
-    INTERPRETER_DELIMITER_LEFT,  // {ci
+    INTERPRETER_DELIMITER_LEFT,  // {$
     INTERPRETER_DELIMITER_RIGHT, //  *}
-    COMPILATION_DELIMITER_LEFT,  // {c
+    COMPILATION_DELIMITER_LEFT,  // {#
     COMPILATION_DELIMITER_RIGHT, //  *}
     LITERAL,
     END_OF_FILE,
@@ -35,8 +35,11 @@ typedef struct {
 
 extern Lexer* lexer;
 
-static inline
-void scanLiterals(Token* token);
+static inline void nextValidCharacter();
+static inline void getTokenType(Token* token, int* depth);
+static inline void scanLiterals(Token* token);
+
+void initLexer(const char* file);
 void tokenize();
 void free_resources();
 

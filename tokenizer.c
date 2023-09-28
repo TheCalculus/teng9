@@ -11,6 +11,17 @@
 
 Lexer* lexer = NULL;
 
+void initLexer(const char* file) {
+    lexer = (Lexer*)malloc(sizeof(Lexer));
+
+    lexer->token_capacity = 10;
+    lexer->token_volume   = 0;
+
+    lexer->tokens = (Token*)malloc(sizeof(Token) * lexer->token_capacity);
+
+    lexer->buffer = fopen(file, "r");
+}
+
 static inline
 void scanLiterals(Token* token) {
     if (isalpha(lexer->active)) {
@@ -24,8 +35,10 @@ void scanLiterals(Token* token) {
 
         literal[++size] = '\0';
 
-        token->type = LITERAL;
-        token->value = (char*)realloc(token->value, sizeof(char) * size);
+        token->type  = LITERAL;
+
+        if (token->value == NULL) token->value = (char*)malloc(sizeof(char) * size);
+        else                      token->value = (char*)realloc(token->value, sizeof(char) * size);
 
         strcpy(token->value, literal);
         
@@ -37,21 +50,100 @@ void scanLiterals(Token* token) {
     }
 }
 
+static inline
+void nextValidCharacter() {
+    // it aint pretty
+    // but it aint broke
+    while ((lexer->active =
+                getc(lexer->buffer)) != EOF &&
+               (isspace(lexer->active)      ||
+               !isalnum(lexer->active)      ||
+               !isprint(lexer->active)
+               )
+          );
+}
+
+static inline
+void getTokenType(Token* token, int* depth) {
+    (*depth)++;
+
+    switch (lexer->active) {
+    case '{':
+        token->type = SIMPLE_DELIMITER_LEFT;
+
+        nextValidCharacter();
+        getTokenType(token, depth);
+
+        ungetc(lexer->active, lexer->buffer);
+        
+        return;
+
+    case '}':
+        token->type = SIMPLE_DELIMITER_RIGHT;
+
+        switch (ungetc(lexer->active, lexer->buffer)) {
+        case '%': token->type = EXPRESSION_DELIMITER_RIGHT;  return;
+        case '$': token->type = INTERPRETER_DELIMITER_RIGHT; return;
+        case '#': token->type = COMPILATION_DELIMITER_RIGHT; return;
+        }
+
+        nextValidCharacter();
+        nextValidCharacter();
+        getTokenType(token, depth);
+
+        ungetc(lexer->active, lexer->buffer);
+
+        return;
+  
+    case '%':
+        token->type = EXPRESSION_DELIMITER_LEFT;
+
+        nextValidCharacter();
+        getTokenType(token, depth);
+
+        return;
+
+    case '$':
+        token->type = INTERPRETER_DELIMITER_LEFT;
+
+        nextValidCharacter();
+        getTokenType(token, depth);
+
+        return;
+
+    case '#':
+        token->type = COMPILATION_DELIMITER_LEFT;
+
+        nextValidCharacter();
+        getTokenType(token, depth);
+        
+        return;
+
+    default:
+        if (*depth == 1) scanLiterals(token);
+    }
+}
+
 void tokenize() {
+    if (lexer == NULL) perror("NULL lexer");
+
+    Token token;
+    int   depth = 0;
+
     while ((lexer->active = getc(lexer->buffer)) != EOF) {
         if (isspace(lexer->active) || !isprint(lexer->active))
             continue;
 
-        Token token;
+        depth       = 0;
         token.size  = 1;
+        
         token.value = (char*)malloc(sizeof(char) * token.size);
         strcpy(token.value, &lexer->active);
 
-        switch (lexer->active) {
-            case '{': break;
-            default: scanLiterals(&token);
-        }
+        getTokenType(&token, &depth);
+        printf("token: %s (%d)\n", token.value, token.type);
 
+nocharalloc:
         if(lexer->token_volume >= lexer->token_capacity) {
             /* resize token sequence by an arbitrary value to allow for more tokens */
             lexer->token_capacity += 50;  // todo: figure out an efficient way to increase size

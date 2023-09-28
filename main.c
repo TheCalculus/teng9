@@ -5,9 +5,10 @@
 
 #include "templator.h"
 #include "api.h"
+#include "tokenizer.h"
 
 int main() {
-    teng9_data name     = { .value = "John Doe",  .parsemethod = SIMPLE_STRING };
+/*    teng9_data name     = { .value = "John Doe",  .parsemethod = SIMPLE_STRING };
     teng9_data location = { .value = "Australia", .parsemethod = SIMPLE_STRING };
 
     const char* templateStr = "Hello {{name}}, welcome to {{location}}!";
@@ -18,7 +19,11 @@ int main() {
     parseTemplate (templateStr, &templite);
     renderTemplate(templateStr, &templite, data, 2);
 
-    free(templite.elements);
+    free(templite.elements); */
+
+    initLexer("template.ch");
+    tokenize();
+    free_resources();
 
     return 0;
 }
