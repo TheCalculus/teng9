@@ -12,7 +12,7 @@ typedef struct {
 
 typedef struct {
     TemplateElement* elements;
-    size_t elementCount;
+    size_t           elementCount;
 } Templite;
 
 typedef enum {
@@ -30,8 +30,7 @@ typedef struct {
 void parseTemplate (const char* template_, Templite* templite);
 void renderTemplate(const char* template_, const Templite* templite, teng9_data data[], size_t amount);
 
-static inline char*
-executeElement (const char* element, teng9_expr parsemethod);
-teng9_data TENG9_CREATE_DATA (const char* value, teng9_expr parsemethod);
+static inline char* executeElement   (const char* element, teng9_expr parsemethod);
+teng9_data          TENG9_CREATE_DATA(const char* value, teng9_expr parsemethod);
 
 #endif
