@@ -36,7 +36,7 @@ typedef struct {
 extern Lexer* lexer;
 
 static inline void nextValidCharacter();
-static inline void getTokenType(Token* token, int* depth);
+static inline void getTokenType(Token* token);
 static inline void scanLiterals(Token* token);
 
 void initLexer(const char* file);

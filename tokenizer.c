@@ -51,76 +51,44 @@ void scanLiterals(Token* token) {
 }
 
 static inline
-void nextValidCharacter() {
-    // it aint pretty
-    // but it aint broke
-    while ((lexer->active =
-                getc(lexer->buffer)) != EOF &&
-               (isspace(lexer->active)      ||
-               !isalnum(lexer->active)      ||
-               !isprint(lexer->active)
-               )
-          );
+bool isvalid() {
+    return lexer->active != EOF
+           && !isspace(lexer->active)
+           && isprint(lexer->active);
 }
 
 static inline
-void getTokenType(Token* token, int* depth) {
-    (*depth)++;
+void nextValidCharacter() {
+    while (!isvalid())
+        getc(lexer->buffer);
+}
 
-    switch (lexer->active) {
+static inline
+void getTokenType(Token* token) {
+    switch (*token->value) {
     case '{':
-        token->type = SIMPLE_DELIMITER_LEFT;
-
         nextValidCharacter();
-        getTokenType(token, depth);
 
-        ungetc(lexer->active, lexer->buffer);
-        
-        return;
-
-    case '}':
-        token->type = SIMPLE_DELIMITER_RIGHT;
-
-        switch (ungetc(lexer->active, lexer->buffer)) {
-        case '%': token->type = EXPRESSION_DELIMITER_RIGHT;  return;
-        case '$': token->type = INTERPRETER_DELIMITER_RIGHT; return;
-        case '#': token->type = COMPILATION_DELIMITER_RIGHT; return;
+        switch (lexer->active) {
+            case '{':
+                break;
+            case '%': 
+                break;
+            case '$': 
+                break;
+            case '#': 
+                break;
+            default:
+                scanLiterals(token);
         }
 
-        nextValidCharacter();
-        nextValidCharacter();
-        getTokenType(token, depth);
+        break;
 
-        ungetc(lexer->active, lexer->buffer);
-
-        return;
-  
-    case '%':
-        token->type = EXPRESSION_DELIMITER_LEFT;
-
-        nextValidCharacter();
-        getTokenType(token, depth);
-
-        return;
-
-    case '$':
-        token->type = INTERPRETER_DELIMITER_LEFT;
-
-        nextValidCharacter();
-        getTokenType(token, depth);
-
-        return;
-
-    case '#':
-        token->type = COMPILATION_DELIMITER_LEFT;
-
-        nextValidCharacter();
-        getTokenType(token, depth);
-        
-        return;
+    case '}':
+        break;
 
     default:
-        if (*depth == 1) scanLiterals(token);
+        scanLiterals(token);
     }
 }
 
@@ -128,34 +96,32 @@ void tokenize() {
     if (lexer == NULL) perror("NULL lexer");
 
     Token token;
-    int   depth = 0;
 
-    while ((lexer->active = getc(lexer->buffer)) != EOF) {
-        if (isspace(lexer->active) || !isprint(lexer->active))
-            continue;
+    while (true) {
+        if (lexer->active == EOF) break;
+        if (!isvalid()) goto next;
 
-        depth       = 0;
         token.size  = 1;
-        
-        token.value = (char*)malloc(sizeof(char) * token.size);
+        token.value = (char*)malloc(sizeof(char));
+
         strcpy(token.value, &lexer->active);
 
-        getTokenType(&token, &depth);
+        getTokenType(&token);
         printf("token: %s (%d)\n", token.value, token.type);
 
-nocharalloc:
         if(lexer->token_volume >= lexer->token_capacity) {
-            /* resize token sequence by an arbitrary value to allow for more tokens */
-            lexer->token_capacity += 50;  // todo: figure out an efficient way to increase size
+            lexer->token_capacity += 10;
             lexer->tokens = (Token*)realloc(lexer->tokens, lexer->token_capacity * sizeof(Token));
             printf("Token* resized to %zu\n", lexer->token_capacity);
         }
 
-        ungetc(lexer->active, lexer->buffer); /* the holy function */
+        ungetc(lexer->active, lexer->buffer);
         memcpy(&lexer->tokens[lexer->token_volume], &token, sizeof(token));
 
-        lexer->active = getc(lexer->buffer);
         lexer->token_volume++;
+next:
+        printf("going to next char");
+        lexer->active = getc(lexer->buffer);
     }
 
     lexer->tokens[lexer->token_volume++] = (Token) { END_OF_FILE, "", 1 };
